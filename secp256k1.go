@@ -7,7 +7,7 @@ import (
 	//secp "./secp256k1-go"
 	"bytes"
 	"encoding/hex"
-	secp "github.com/haltingstate/secp256k1-go/secp256k1-go2"
+	secp "github.com/bitnexty/secp256k1-go/secp256k1-go2"
 	"log"
 )
 
