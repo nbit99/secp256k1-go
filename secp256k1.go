@@ -1,14 +1,12 @@
 package secp256k1
 
 import (
-	//"unsafe"
-	//"fmt"
-	//"errors"
-	//secp "./secp256k1-go"
+	"fmt"
 	"bytes"
 	"encoding/hex"
-	secp "github.com/bitnexty/secp256k1-go/secp256k1-go2"
 	"log"
+	
+	secp "github.com/bitnexty/secp256k1-go/secp256k1-go2"
 )
 
 //intenal, may fail
@@ -38,7 +36,6 @@ func pubkeyFromSeckey(seckey []byte) []byte {
 	}
 
 	if ret := VerifyPubkey(pubkey); ret != 1 {
-
 		log.Printf("seckey= %s", hex.EncodeToString(seckey))
 		log.Printf("pubkey= %s", hex.EncodeToString(pubkey))
 		log.Panic("ERROR: pubkey verification failed, for deterministic. ret=%d", ret)
@@ -76,17 +73,18 @@ new_seckey:
 //deterministic gen will always return a valid private key
 func PubkeyFromSeckey(seckey []byte) []byte {
 	if len(seckey) != 32 {
-		log.Panic("PubkeyFromSeckey: invalid length")
+		log.Println("PubkeyFromSeckey: invalid length")
+		return nil
 	}
 
 	pubkey := pubkeyFromSeckey(seckey)
 	if pubkey == nil {
-		log.Panic("ERRROR: impossible, pubkey generation failed")
+		log.Println("ERRROR: impossible, pubkey generation failed")
 		//goto new_seckey
 		return nil
 	}
 	if ret := secp.PubkeyIsValid(pubkey); ret != 1 {
-		log.Panic("ERROR: Pubkey invalid, ret=%s", ret)
+		log.Println("ERROR: Pubkey invalid, ret=%s", ret)
 		//goto new_seckey
 		return nil
 	}
@@ -217,6 +215,73 @@ func DeterministicKeyPairIterator(seed_in []byte) ([]byte, []byte, []byte) {
 	seed2 := SumSHA256(append(seed_in, seed1...))
 	pubkey, seckey := generateDeterministicKeyPair(seed2) //this is our seckey
 	return seed1, pubkey, seckey
+}
+
+// bts sign
+func BtsSign(msg []byte, seckey []byte, canonical bool) (res []byte, err error) {
+	if len(seckey) != 32 {
+		err = fmt.Errorf("Invalid seckey length")
+		return
+	}
+
+	if secp.SeckeyIsValid(seckey) != 1 {
+		err = fmt.Errorf("Attempting to sign with invalid seckey")
+		return
+	}
+	if msg == nil {
+		err = fmt.Errorf("message is nil")
+		return
+	}
+
+	var nonce []byte
+	var sig []byte = make([]byte, 65)
+	var recid int
+	pubkey := PubkeyFromSeckey(seckey)
+
+	var cSig secp.Signature
+
+	var seckey1 secp.Number
+	var msg1 secp.Number
+	var nonce1 secp.Number
+
+	for {
+		nonce = RandByte(32)
+		seckey1.SetBytes(seckey)
+		msg1.SetBytes(msg)
+		nonce1.SetBytes(nonce)
+
+		ret := cSig.Sign(&seckey1, &msg1, &nonce1, &recid)
+
+		if ret == 0 {
+			fmt.Printf("Secp25k1-go, Sign, signature operation failed")
+			continue
+		}
+		cbytes := cSig.Bytes()
+		// try recover
+		rpk, rret := secp.RecoverPublicKey(cbytes, msg, recid)
+		if rret != 1 {
+			fmt.Printf("sign data cannot be recover, ret=%d, retry it\n", rret)
+			continue
+		}
+		if bytes.Compare(pubkey, rpk) != 0 {
+			fmt.Printf("recovered public not equal with derived from seckey\n")
+			continue
+		}
+
+		copy(sig[1:], cbytes)
+		sig[0] = byte(27 + 4 + int(recid))
+		if canonical && IsCanonical(cbytes) {
+			break
+		}
+	}
+
+	return sig[:], nil
+}
+
+func IsCanonical(sig []byte) bool {
+	tmp := (sig[0]&0x80 != 0) || (sig[0] == 0x0 && (sig[1]&0x80 != 0)) || (sig[32]&0x80 != 0) || (sig[32] == 0x0 && (sig[33]&0x80 != 0))
+
+	return !tmp
 }
 
 //Rename SignHash
