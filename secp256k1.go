@@ -284,17 +284,17 @@ func IsCanonical(sig []byte) bool {
 	return !tmp
 }
 
-//Rename SignHash
-func Sign(msg []byte, seckey []byte) []byte {
-
+// Rename SignHash
+func Sign(msg []byte, seckey []byte) ([]byte, error) {
 	if len(seckey) != 32 {
-		log.Panic("Sign, Invalid seckey length")
+		// log.Printf("Sign, Invalid seckey length")
+		return nil, fmt.Errorf("Sign: Invalid seckey length")
 	}
 	if secp.SeckeyIsValid(seckey) != 1 {
-		log.Panic("Attempting to sign with invalid seckey")
+		return nil, fmt.Errorf("Attempting to sign with invalid seckey")
 	}
 	if msg == nil {
-		log.Panic("Sign, message nil")
+		return nil, fmt.Errorf("Sign: message nil")
 	}
 	var nonce []byte = RandByte(32)
 	var sig []byte = make([]byte, 65)
@@ -313,7 +313,7 @@ func Sign(msg []byte, seckey []byte) []byte {
 	ret := cSig.Sign(&seckey1, &msg1, &nonce1, &recid)
 
 	if ret != 1 {
-		log.Panic("Secp25k1-go, Sign, signature operation failed")
+		return nil, fmt.Errorf("Sign: signature operation failed")
 	}
 
 	sig_bytes := cSig.Bytes()
@@ -321,15 +321,15 @@ func Sign(msg []byte, seckey []byte) []byte {
 		sig[i] = sig_bytes[i]
 	}
 	if len(sig_bytes) != 64 {
-		log.Fatal("Invalid signature byte count: %s", len(sig_bytes))
+		return nil, fmt.Errorf("Invalid signature byte count: %s", len(sig_bytes))
 	}
 	sig[64] = byte(int(recid))
 
 	if int(recid) > 4 {
-		log.Panic()
+		return nil, fmt.Errorf("invalid recid")
 	}
 
-	return sig
+	return sig, nil
 }
 
 //generate signature in repeatable way
