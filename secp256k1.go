@@ -279,9 +279,10 @@ func BtsSign(msg []byte, seckey []byte, canonical bool) (res []byte, err error) 
 }
 
 func IsCanonical(sig []byte) bool {
-	tmp := (sig[0]&0x80 != 0) || (sig[0] == 0x0 && (sig[1]&0x80 != 0)) || (sig[32]&0x80 != 0) || (sig[32] == 0x0 && (sig[33]&0x80 != 0))
+	return !(sig[0]&0x80 != 0) && !(sig[0]==0 && (sig[1]&0x80)==0) && (sig[32]&0x80==0) && !(sig[32] == 0x0 && (sig[33]&0x80 != 0))
 
-	return !tmp
+	// tmp := (sig[0]&0x80 != 0) || (sig[0] == 0x0 && (sig[1]&0x80 != 0)) || (sig[32]&0x80 != 0) || (sig[32] == 0x0 && (sig[33]&0x80 != 0))
+	// return !tmp
 }
 
 // Rename SignHash
